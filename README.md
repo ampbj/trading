@@ -1,1 +1,1 @@
-This reposirtory contains all the packages require for ampbj trading.
+This reposirtory contains all the packages require for trading.
