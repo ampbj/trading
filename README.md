@@ -1,1 +1,1 @@
-This reposirtory contains all the packages require for trading.
+This repository contains all the packages required for trading.
