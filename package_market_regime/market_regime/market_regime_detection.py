@@ -18,37 +18,55 @@ class Market_regime:
         pd.plotting.register_matplotlib_converters()
         self.data = data.rename(columns={columns[0]: 'Price'}, inplace=False)
         self.data_freq = data_freq
-        #check if index is datetime index
+        # check if index is datetime index
         if self.data.index.dtype == '<M8[ns]':
             self.data.index = pd.DatetimeIndex(
                 self.data.index).to_period(self.data_freq)
-        self.data["Event"] = pd.Series('string')
         self.data['pct_change'] = self.data['Price'].pct_change(n_pct_change)
-        self.DC_event = 'init'
-        self.DC_highest_price = self.data.iloc[0]
-        self.DC_lowest_price = self.data.iloc[0]
 
-    def directional_change_fit(self, dc_offset=0.1):
-        for index, values in self.data.iterrows():
-            if self.DC_event == 'downtrend' or self.DC_event == 'init':
-                if values['Price'] >= (self.DC_lowest_price['Price'] * (1 + dc_offset)):
-                    self.DC_event = 'uptrend'
-                    self.data.loc[index, 'Event'] = 'Up'
-                    self.data.loc[index + 1, 'Event'] = 'Start upward OS'
-                    self.data.loc[self.DC_lowest_price.name, 'Event'] = 'DXP'
-                    self.DC_highest_price = values
-                if values['Price'] <= self.DC_lowest_price['Price']:
-                    self.DC_lowest_price = values
+    def directional_change_fit(self, dc_offset=[0.1, 0.2]):
+        dc_offset.sort()
+        dc_offset.reverse()
+        self.data['BBTheta'] = pd.Series('bool')
+        for item_number in range(len(dc_offset)):
+            current_offset_value = dc_offset[item_number]
+            curent_offset_column = f"Event_{current_offset_value}"
+            self.data[curent_offset_column] = pd.Series('string')
+            self.DC_event = 'init'
+            self.DC_highest_price = self.data.iloc[0]
+            self.DC_lowest_price = self.data.iloc[0]
+            for index, values in self.data.iterrows():
+                if self.DC_event == 'downtrend' or self.DC_event == 'init':
+                    if values['Price'] >= (self.DC_lowest_price['Price'] * (1 + current_offset_value)):
+                        self.DC_event = 'uptrend'
+                        self.data.loc[index, curent_offset_column] = 'Up'
+                        self.data.loc[index + 1,
+                                      curent_offset_column] = 'Start upward OS'
+                        self.data.loc[self.DC_lowest_price.name,
+                                      curent_offset_column] = 'DXP'
+                        self.DC_highest_price = values
+                        if item_number == 1 and self.data.loc[self.DC_lowest_price.name][f"Event_{dc_offset[0]}"] is not None:
+                            self.data.loc[index, 'BBTheta'] = True
+                        else:
+                            self.data.loc[index, 'BBTheta'] = False
+                    if values['Price'] <= self.DC_lowest_price['Price']:
+                        self.DC_lowest_price = values
 
-            if self.DC_event == 'uptrend' or self.DC_event == 'init':
-                if values['Price'] <= (self.DC_highest_price['Price'] * (1 - dc_offset)):
-                    self.DC_event = 'downtrend'
-                    self.data.loc[index, 'Event'] = 'Down'
-                    self.data.loc[index + 1, 'Event'] = 'Start downward OS'
-                    self.data.loc[self.DC_highest_price.name, 'Event'] = 'UXP'
-                    self.DC_lowest_price = values
-                if values['Price'] >= self.DC_highest_price['Price']:
-                    self.DC_highest_price = values
+                if self.DC_event == 'uptrend' or self.DC_event == 'init':
+                    if values['Price'] <= (self.DC_highest_price['Price'] * (1 - current_offset_value)):
+                        self.DC_event = 'downtrend'
+                        self.data.loc[index, curent_offset_column] = 'Down'
+                        self.data.loc[index + 1,
+                                      curent_offset_column] = 'Start downward OS'
+                        self.data.loc[self.DC_highest_price.name,
+                                      curent_offset_column] = 'UXP'
+                        self.DC_lowest_price = values
+                        if item_number == 1 and self.data.loc[self.DC_highest_price.name][f"Event_{dc_offset[0]}"] is not None:
+                            self.data.loc[index, 'BBTheta'] = True
+                        else:
+                            self.data.loc[index, 'BBTheta'] = False
+                    if values['Price'] >= self.DC_highest_price['Price']:
+                        self.DC_highest_price = values
         return self
 
     def markov_switching_regression_fit(self, k_regimes=3, summary=False, expected_duration=False):
