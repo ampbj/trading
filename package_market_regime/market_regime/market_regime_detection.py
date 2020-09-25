@@ -45,10 +45,11 @@ class Market_regime:
                                       curent_offset_column] = 'Start upward OS'
                         if self.data.isnull().loc[self.DC_lowest_price.name][curent_offset_column]:
                             self.data.loc[self.DC_lowest_price.name,
-                                        curent_offset_column] = 'DXP'
+                                          curent_offset_column] = 'DXP'
                         self.DC_highest_price = values
-                        dc_current_lowest_price = self.data.loc[self.DC_lowest_price.name][f"Event_{dc_offset[0]}"]
-                        if item_number == 1 and (dc_current_lowest_price== 'DXP' or dc_current_lowest_price== 'Down'):
+                        dc_current_lowest_price = self.data.loc[
+                            self.DC_lowest_price.name][f"Event_{dc_offset[0]}"]
+                        if item_number == 1 and (dc_current_lowest_price == 'DXP' or dc_current_lowest_price == 'Down'):
                             self.data.loc[index, 'BBTheta'] = True
                     if values['Price'] <= self.DC_lowest_price['Price']:
                         self.DC_lowest_price = values
@@ -61,10 +62,11 @@ class Market_regime:
                                       curent_offset_column] = 'Start downward OS'
                         if self.data.isnull().loc[self.DC_highest_price.name][curent_offset_column]:
                             self.data.loc[self.DC_highest_price.name,
-                                        curent_offset_column] = 'UXP'
+                                          curent_offset_column] = 'UXP'
                         self.DC_lowest_price = values
-                        dc_current_highest_price = self.data.loc[self.DC_highest_price.name][f"Event_{dc_offset[0]}"]
-                        if item_number == 1 and (dc_current_highest_price== 'UXP' or dc_current_highest_price == 'Up'):
+                        dc_current_highest_price = self.data.loc[
+                            self.DC_highest_price.name][f"Event_{dc_offset[0]}"]
+                        if item_number == 1 and (dc_current_highest_price == 'UXP' or dc_current_highest_price == 'Up'):
                             self.data.loc[index, 'BBTheta'] = True
                     if values['Price'] >= self.DC_highest_price['Price']:
                         self.DC_highest_price = values
@@ -114,7 +116,7 @@ class Market_regime:
         ax[0].plot(data_to_draw['Price'], label='Price', color='w')
         data_event_columns = self.data.filter(regex=("Event.*"))
         first_round = True
-        fontsize=7
+        fontsize = 7
         for column in data_event_columns:
             annotate_result = data_to_draw[self.data[column].notnull()]
             match = re.search(r'(Event_)([\w\.-]+)', column)
@@ -140,10 +142,10 @@ class Market_regime:
                         ax[0].annotate(data_to_draw.loc[index]['BBTheta'], xy=(index, row['Price']), xytext=(index - datetime.timedelta(days=50), (row['Price'] - 25)), color='#EA62EC',
                                        arrowprops=dict(arrowstyle="->", connectionstyle="angle3,angleA=0,angleB=40", color='#EA62EC'), fontsize=fontsize)
                 elif row[column] == 'DXP':
-                    ax[0].annotate(text, xy=(index, row['Price']), xytext=(index- datetime.timedelta(days=10), (row['Price'] - 20 + offset_value)), color=color,
+                    ax[0].annotate(text, xy=(index, row['Price']), xytext=(index - datetime.timedelta(days=10), (row['Price'] - 20 + offset_value)), color=color,
                                    arrowprops=dict(arrowstyle="->", connectionstyle="angle3,angleA=0,angleB=90", color=color), fontsize=fontsize)
                 elif row[column] == 'UXP':
-                    ax[0].annotate(text, xy=(index, row['Price']), xytext=(index- datetime.timedelta(days=10), (row['Price'] + 20 - offset_value)), color=color,
+                    ax[0].annotate(text, xy=(index, row['Price']), xytext=(index - datetime.timedelta(days=10), (row['Price'] + 20 - offset_value)), color=color,
                                    arrowprops=dict(arrowstyle="->", connectionstyle="angle3,angleA=0,angleB=90", color=color), fontsize=fontsize)
                 first_round = False
         ax[1].plot(data_to_draw['pct_change'], color='y',
