@@ -46,10 +46,13 @@ class Market_regime:
                         if self.data.isnull().loc[self.DC_lowest_price.name][curent_offset_column]:
                             self.data.loc[self.DC_lowest_price.name,
                                           curent_offset_column] = 'DXP'
+                        else:
+                            self.data.loc[self.DC_lowest_price.name,
+                                          curent_offset_column] = 'Down+DXP'
                         self.DC_highest_price = values
                         dc_current_lowest_price = self.data.loc[
                             self.DC_lowest_price.name][f"Event_{dc_offset[0]}"]
-                        if item_number == 1 and (dc_current_lowest_price == 'DXP' or dc_current_lowest_price == 'Down'):
+                        if item_number == 1 and (dc_current_lowest_price == 'DXP' or dc_current_lowest_price == 'Down+DXP'):
                             self.data.loc[index, 'BBTheta'] = True
                     if values['Price'] <= self.DC_lowest_price['Price']:
                         self.DC_lowest_price = values
@@ -63,10 +66,13 @@ class Market_regime:
                         if self.data.isnull().loc[self.DC_highest_price.name][curent_offset_column]:
                             self.data.loc[self.DC_highest_price.name,
                                           curent_offset_column] = 'UXP'
+                        else:
+                            self.data.loc[self.DC_lowest_price.name,
+                                          curent_offset_column] = 'Up+UXP'
                         self.DC_lowest_price = values
                         dc_current_highest_price = self.data.loc[
                             self.DC_highest_price.name][f"Event_{dc_offset[0]}"]
-                        if item_number == 1 and (dc_current_highest_price == 'UXP' or dc_current_highest_price == 'Up'):
+                        if item_number == 1 and (dc_current_highest_price == 'UXP' or dc_current_highest_price == 'Up+UXP'):
                             self.data.loc[index, 'BBTheta'] = True
                     if values['Price'] >= self.DC_highest_price['Price']:
                         self.DC_highest_price = values
@@ -141,10 +147,10 @@ class Market_regime:
                     if not first_round and data_to_draw.loc[index]['BBTheta'] is True:
                         ax[0].annotate(data_to_draw.loc[index]['BBTheta'], xy=(index, row['Price']), xytext=(index - datetime.timedelta(days=50), (row['Price'] - 25)), color='#EA62EC',
                                        arrowprops=dict(arrowstyle="->", connectionstyle="angle3,angleA=0,angleB=40", color='#EA62EC'), fontsize=fontsize)
-                elif row[column] == 'DXP':
+                elif row[column] == 'DXP' or row[column] == 'Down+DXP':
                     ax[0].annotate(text, xy=(index, row['Price']), xytext=(index - datetime.timedelta(days=10), (row['Price'] - 20 + offset_value)), color=color,
                                    arrowprops=dict(arrowstyle="->", connectionstyle="angle3,angleA=0,angleB=90", color=color), fontsize=fontsize)
-                elif row[column] == 'UXP':
+                elif row[column] == 'UXP' or row[column] == 'Up+UXP':
                     ax[0].annotate(text, xy=(index, row['Price']), xytext=(index - datetime.timedelta(days=10), (row['Price'] + 20 - offset_value)), color=color,
                                    arrowprops=dict(arrowstyle="->", connectionstyle="angle3,angleA=0,angleB=90", color=color), fontsize=fontsize)
                 first_round = False
