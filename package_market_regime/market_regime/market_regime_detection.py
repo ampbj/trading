@@ -6,6 +6,7 @@ import matplotlib
 import matplotlib.pyplot as plt
 from matplotlib import dates
 import statsmodels.api as sm
+import re
 np.random.seed(42)
 
 
@@ -42,13 +43,13 @@ class Market_regime:
                         self.data.loc[index, curent_offset_column] = 'Up'
                         self.data.loc[index + 1,
                                       curent_offset_column] = 'Start upward OS'
-                        self.data.loc[self.DC_lowest_price.name,
-                                      curent_offset_column] = 'DXP'
+                        if self.data.isnull().loc[self.DC_lowest_price.name][curent_offset_column]:
+                            self.data.loc[self.DC_lowest_price.name,
+                                        curent_offset_column] = 'DXP'
                         self.DC_highest_price = values
-                        if item_number == 1 and self.data.loc[self.DC_lowest_price.name][f"Event_{dc_offset[0]}"] is not None:
+                        dc_current_lowest_price = self.data.loc[self.DC_lowest_price.name][f"Event_{dc_offset[0]}"]
+                        if item_number == 1 and (dc_current_lowest_price== 'DXP' or dc_current_lowest_price== 'Down'):
                             self.data.loc[index, 'BBTheta'] = True
-                        else:
-                            self.data.loc[index, 'BBTheta'] = False
                     if values['Price'] <= self.DC_lowest_price['Price']:
                         self.DC_lowest_price = values
 
@@ -58,13 +59,13 @@ class Market_regime:
                         self.data.loc[index, curent_offset_column] = 'Down'
                         self.data.loc[index + 1,
                                       curent_offset_column] = 'Start downward OS'
-                        self.data.loc[self.DC_highest_price.name,
-                                      curent_offset_column] = 'UXP'
+                        if self.data.isnull().loc[self.DC_highest_price.name][curent_offset_column]:
+                            self.data.loc[self.DC_highest_price.name,
+                                        curent_offset_column] = 'UXP'
                         self.DC_lowest_price = values
-                        if item_number == 1 and self.data.loc[self.DC_highest_price.name][f"Event_{dc_offset[0]}"] is not None:
+                        dc_current_highest_price = self.data.loc[self.DC_highest_price.name][f"Event_{dc_offset[0]}"]
+                        if item_number == 1 and (dc_current_highest_price== 'UXP' or dc_current_highest_price == 'Up'):
                             self.data.loc[index, 'BBTheta'] = True
-                        else:
-                            self.data.loc[index, 'BBTheta'] = False
                     if values['Price'] >= self.DC_highest_price['Price']:
                         self.DC_highest_price = values
         return self
@@ -110,24 +111,41 @@ class Market_regime:
         [ax[i].grid(color='r', linestyle='-', linewidth=1, alpha=0.3)
          for i in range(nrows)]
         plt.xticks(rotation=90)
-        annotate_result = data_to_draw[self.data['Event'].notnull()]
-        if annotate_result.empty:
-            raise Exception(
-                'No event Exist! Please run directional_change_fit method first')
-        ax[0].plot(data_to_draw['Price'], label='Price')
-        for index, row in annotate_result.iterrows():
-            if row['Event'] == 'Down':
-                ax[0].annotate(row['Event'], xy=(index, row['Price']), xytext=(index, (row['Price'] + 25)), color='r',
-                               arrowprops=dict(arrowstyle="->", connectionstyle="angle,angleA=0,angleB=80", color='r'))
-            elif row['Event'] == 'Up':
-                ax[0].annotate(row['Event'], xy=(index, row['Price']), xytext=(index, (row['Price'] - 15)), color='#0C7D4E',
-                               arrowprops=dict(arrowstyle="->", connectionstyle="angle3,angleA=0,angleB=-60", color='#0C7D4E'))
-            elif row['Event'] == 'DXP':
-                ax[0].annotate(row['Event'], xy=(index, row['Price']), xytext=(index, (row['Price'] - 15)), color='fuchsia',
-                               arrowprops=dict(arrowstyle="->", connectionstyle="angle3,angleA=0,angleB=50", color='fuchsia'))
-            elif row['Event'] == 'UXP':
-                ax[0].annotate(row['Event'], xy=(index, row['Price']), xytext=(index, (row['Price'] + 15)), color='#2BB2BF',
-                               arrowprops=dict(arrowstyle="->", connectionstyle="angle3,angleA=0,angleB=90", color='#2BB2BF'))
+        ax[0].plot(data_to_draw['Price'], label='Price', color='w')
+        data_event_columns = self.data.filter(regex=("Event.*"))
+        first_round = True
+        fontsize=7
+        for column in data_event_columns:
+            annotate_result = data_to_draw[self.data[column].notnull()]
+            match = re.search(r'(Event_)([\w\.-]+)', column)
+            superscript = match.group(2)
+            if first_round:
+                color = 'red'
+                offset_value = 2
+            else:
+                color = '#42AFD8'
+                offset_value = 10
+            for index, row in annotate_result.iterrows():
+                text = "%s^%s" % (row[column], superscript)
+                if row[column] == 'Down':
+                    ax[0].annotate(text, xy=(index, row['Price']), xytext=(index - datetime.timedelta(days=40), (row['Price'] + 20)), color=color,
+                                   arrowprops=dict(arrowstyle="->", connectionstyle="angle3,angleA=0,angleB=80", color=color), fontsize=fontsize)
+                    if not first_round and data_to_draw.loc[index]['BBTheta'] is True:
+                        ax[0].annotate(data_to_draw.loc[index]['BBTheta'], xy=(index, row['Price']), xytext=(index + datetime.timedelta(days=30), (row['Price'] + 20)), color='#EA62EC',
+                                       arrowprops=dict(arrowstyle="->", connectionstyle="angle3,angleA=0,angleB=70", color='#EA62EC'), fontsize=fontsize)
+                elif row[column] == 'Up':
+                    ax[0].annotate(text, xy=(index, row['Price']), xytext=(index, (row['Price'] - 20)), color=color,
+                                   arrowprops=dict(arrowstyle="->", connectionstyle="angle3,angleA=0,angleB=-60", color=color), fontsize=fontsize)
+                    if not first_round and data_to_draw.loc[index]['BBTheta'] is True:
+                        ax[0].annotate(data_to_draw.loc[index]['BBTheta'], xy=(index, row['Price']), xytext=(index - datetime.timedelta(days=50), (row['Price'] - 25)), color='#EA62EC',
+                                       arrowprops=dict(arrowstyle="->", connectionstyle="angle3,angleA=0,angleB=40", color='#EA62EC'), fontsize=fontsize)
+                elif row[column] == 'DXP':
+                    ax[0].annotate(text, xy=(index, row['Price']), xytext=(index- datetime.timedelta(days=10), (row['Price'] - 20 + offset_value)), color=color,
+                                   arrowprops=dict(arrowstyle="->", connectionstyle="angle3,angleA=0,angleB=90", color=color), fontsize=fontsize)
+                elif row[column] == 'UXP':
+                    ax[0].annotate(text, xy=(index, row['Price']), xytext=(index- datetime.timedelta(days=10), (row['Price'] + 20 - offset_value)), color=color,
+                                   arrowprops=dict(arrowstyle="->", connectionstyle="angle3,angleA=0,angleB=90", color=color), fontsize=fontsize)
+                first_round = False
         ax[1].plot(data_to_draw['pct_change'], color='y',
                    linewidth=1.5, label='Price return')
         markov_result = self.Markov_switching_model.smoothed_marginal_probabilities
