@@ -29,6 +29,7 @@ class Market_regime:
         dc_offset.sort()
         dc_offset.reverse()
         self.data['BBTheta'] = pd.Series('bool')
+        self.data['OSV'] = pd.Series('float')
         for item_number in range(len(dc_offset)):
             current_offset_value = dc_offset[item_number]
             curent_offset_column = f"Event_{current_offset_value}"
@@ -54,6 +55,9 @@ class Market_regime:
                             self.DC_lowest_price.name][f"Event_{dc_offset[0]}"]
                         if item_number == 1 and (dc_current_lowest_price == 'DXP' or dc_current_lowest_price == 'Down+DXP'):
                             self.data.loc[index, 'BBTheta'] = True
+                        if item_number == 1:
+                            osv_value = self.OSV(self.DC_lowest_price.name,dc_offset[0], 'Down')
+                            self.data.loc[index, 'OSV'] = osv_value
                     if values['Price'] <= self.DC_lowest_price['Price']:
                         self.DC_lowest_price = values
 
@@ -67,16 +71,34 @@ class Market_regime:
                             self.data.loc[self.DC_highest_price.name,
                                           curent_offset_column] = 'UXP'
                         else:
-                            self.data.loc[self.DC_lowest_price.name,
+                            self.data.loc[self.DC_highest_price.name,
                                           curent_offset_column] = 'Up+UXP'
                         self.DC_lowest_price = values
                         dc_current_highest_price = self.data.loc[
                             self.DC_highest_price.name][f"Event_{dc_offset[0]}"]
                         if item_number == 1 and (dc_current_highest_price == 'UXP' or dc_current_highest_price == 'Up+UXP'):
                             self.data.loc[index, 'BBTheta'] = True
+                        if item_number == 1:
+                            osv_value = self.OSV(self.DC_highest_price.name,dc_offset[0], 'Up')
+                            self.data.loc[index, 'OSV'] = osv_value
                     if values['Price'] >= self.DC_highest_price['Price']:
                         self.DC_highest_price = values
         return self
+    # Calculating OSV value as an independent variable used for prediction according to the paper
+    def OSV(self, STheta_extreme_index, BTheta, direction):
+        STheta_extreme_price = self.data.loc[STheta_extreme_index]['Price']
+        BTheta_column = f"Event_{BTheta}"
+        BTheta_rows = self.data[self.data.index < STheta_extreme_index]
+        BTheta_rows = BTheta_rows[BTheta_rows[BTheta_column].notnull()][BTheta_column]
+        if not BTheta_rows.empty:
+            for index, row in BTheta_rows[::-1].iteritems():
+                if row == direction:
+                    PDCC_BTheta = self.data.loc[index]['Price']
+                    OSV = ((STheta_extreme_price - PDCC_BTheta) / PDCC_BTheta) / BTheta
+                    return OSV
+        else:
+            return None
+
 
     def markov_switching_regression_fit(self, k_regimes=3, summary=False, expected_duration=False):
         self.Markov_switching_model = sm.tsa.MarkovRegression(self.data['pct_change'].dropna(), k_regimes=k_regimes,
