@@ -93,7 +93,7 @@ class Market_regime:
                         self.DC_highest_price = values
 
         return self
-        
+
     # Calculating OSV value as an independent variable used for prediction according to the paper
     def OSV(self, STheta_extreme_index, BTheta, direction):
         if direction == 'Down':
@@ -111,7 +111,7 @@ class Market_regime:
                     OSV = ((STheta_extreme_price - PDCC_BTheta) / PDCC_BTheta) / BTheta
                     return OSV
         else:
-            return None
+            return
 
 
     def markov_switching_regression_fit(self, k_regimes=3, summary=False, expected_duration=False):
@@ -189,7 +189,10 @@ class Market_regime:
                 elif row[column] == 'UXP' or row[column] == 'Up+UXP':
                     ax[0].annotate(text, xy=(index, row['Price']), xytext=(index - datetime.timedelta(days=10), (row['Price'] + 20 - offset_value)), color=color,
                                    arrowprops=dict(arrowstyle="->", connectionstyle="angle3,angleA=0,angleB=90", color=color), fontsize=fontsize)
-                first_round = False
+                if not first_round and not pd.isnull(data_to_draw.loc[index]['OSV']):
+                    ax[0].annotate(data_to_draw.loc[index]['OSV'].round(decimals=2), xy=(index, row['Price']), xytext=(index - datetime.timedelta(days=55), (row['Price'] - 30)), color='#00B748',
+                                       arrowprops=dict(arrowstyle="->", connectionstyle="angle3,angleA=0,angleB=25", color='#00B748'), fontsize=fontsize)
+            first_round = False
         ax[1].plot(data_to_draw['pct_change'], color='y',
                    linewidth=1.5, label='Price return')
         markov_result = self.Markov_switching_model.smoothed_marginal_probabilities
