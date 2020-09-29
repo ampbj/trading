@@ -42,22 +42,26 @@ class Market_regime:
                     if values['Price'] >= (self.DC_lowest_price['Price'] * (1 + current_offset_value)):
                         self.DC_event = 'uptrend'
                         self.data.loc[index, curent_offset_column] = 'Up'
-                        self.data.loc[index + 1,
-                                      curent_offset_column] = 'Start upward OS'
+
                         if self.data.isnull().loc[self.DC_lowest_price.name][curent_offset_column]:
                             self.data.loc[self.DC_lowest_price.name,
                                           curent_offset_column] = 'DXP'
                         else:
                             self.data.loc[self.DC_lowest_price.name,
                                           curent_offset_column] = 'Down+DXP'
-                        self.DC_highest_price = values
-                        dc_current_lowest_price = self.data.loc[
-                            self.DC_lowest_price.name][f"Event_{dc_offset[0]}"]
-                        if item_number == 1 and (dc_current_lowest_price == 'DXP' or dc_current_lowest_price == 'Down+DXP'):
-                            self.data.loc[index, 'BBTheta'] = True
+
                         if item_number == 1:
+                            #OSV discovery
                             osv_value = self.OSV(self.DC_lowest_price.name,dc_offset[0], 'Down')
                             self.data.loc[index, 'OSV'] = osv_value
+                            #BBTheta boolean value discovery
+                            dc_current_lowest_price = self.data.loc[
+                                self.DC_lowest_price.name][f"Event_{dc_offset[0]}"]
+                            if dc_current_lowest_price == 'DXP' or dc_current_lowest_price == 'Down+DXP':
+                                self.data.loc[index, 'BBTheta'] = True
+
+                        self.DC_highest_price = values
+
                     if values['Price'] <= self.DC_lowest_price['Price']:
                         self.DC_lowest_price = values
 
@@ -65,34 +69,44 @@ class Market_regime:
                     if values['Price'] <= (self.DC_highest_price['Price'] * (1 - current_offset_value)):
                         self.DC_event = 'downtrend'
                         self.data.loc[index, curent_offset_column] = 'Down'
-                        self.data.loc[index + 1,
-                                      curent_offset_column] = 'Start downward OS'
+                        
                         if self.data.isnull().loc[self.DC_highest_price.name][curent_offset_column]:
                             self.data.loc[self.DC_highest_price.name,
                                           curent_offset_column] = 'UXP'
                         else:
                             self.data.loc[self.DC_highest_price.name,
                                           curent_offset_column] = 'Up+UXP'
-                        self.DC_lowest_price = values
-                        dc_current_highest_price = self.data.loc[
-                            self.DC_highest_price.name][f"Event_{dc_offset[0]}"]
-                        if item_number == 1 and (dc_current_highest_price == 'UXP' or dc_current_highest_price == 'Up+UXP'):
-                            self.data.loc[index, 'BBTheta'] = True
+
                         if item_number == 1:
+                            #OSV discovery
                             osv_value = self.OSV(self.DC_highest_price.name,dc_offset[0], 'Up')
                             self.data.loc[index, 'OSV'] = osv_value
+                            #BBTheta boolean value discovery
+                            dc_current_highest_price = self.data.loc[
+                            self.DC_highest_price.name][f"Event_{dc_offset[0]}"]
+                            if dc_current_highest_price == 'UXP' or dc_current_highest_price == 'Up+UXP':
+                                self.data.loc[index, 'BBTheta'] = True
+
+                        self.DC_lowest_price = values
+
                     if values['Price'] >= self.DC_highest_price['Price']:
                         self.DC_highest_price = values
+
         return self
+        
     # Calculating OSV value as an independent variable used for prediction according to the paper
     def OSV(self, STheta_extreme_index, BTheta, direction):
+        if direction == 'Down':
+            alternate_direction_value = 'Down+DXP'
+        if direction == 'Up':
+            alternate_direction_value = 'Up+UXP'
         STheta_extreme_price = self.data.loc[STheta_extreme_index]['Price']
         BTheta_column = f"Event_{BTheta}"
-        BTheta_rows = self.data[self.data.index < STheta_extreme_index]
+        BTheta_rows = self.data[self.data.index <= STheta_extreme_index]
         BTheta_rows = BTheta_rows[BTheta_rows[BTheta_column].notnull()][BTheta_column]
         if not BTheta_rows.empty:
             for index, row in BTheta_rows[::-1].iteritems():
-                if row == direction:
+                if row == direction or row == alternate_direction_value:
                     PDCC_BTheta = self.data.loc[index]['Price']
                     OSV = ((STheta_extreme_price - PDCC_BTheta) / PDCC_BTheta) / BTheta
                     return OSV
