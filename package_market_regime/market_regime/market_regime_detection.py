@@ -172,10 +172,10 @@ class Market_regime:
             for index, row in annotate_result.iterrows():
                 text = "%s^%s" % (row[column], superscript)
                 if row[column] == 'Down':
-                    ax[0].annotate(text, xy=(index, row['Price']), xytext=(index - datetime.timedelta(days=40), (row['Price'] + 20)), color=color,
+                    ax[0].annotate(text, xy=(index, row['Price']), xytext=(index - datetime.timedelta(days=10), (row['Price'] + 20)), color=color,
                                    arrowprops=dict(arrowstyle="->", connectionstyle="angle3,angleA=0,angleB=80", color=color), fontsize=fontsize)
                     if not first_round and data_to_draw.loc[index]['BBTheta'] is True:
-                        ax[0].annotate(data_to_draw.loc[index]['BBTheta'], xy=(index, row['Price']), xytext=(index + datetime.timedelta(days=30), (row['Price'] + 20)), color='#EA62EC',
+                        ax[0].annotate(data_to_draw.loc[index]['BBTheta'], xy=(index, row['Price']), xytext=(index + datetime.timedelta(days=30), (row['Price'] + 5)), color='#EA62EC',
                                        arrowprops=dict(arrowstyle="->", connectionstyle="angle3,angleA=0,angleB=70", color='#EA62EC'), fontsize=fontsize)
                 elif row[column] == 'Up':
                     ax[0].annotate(text, xy=(index, row['Price']), xytext=(index, (row['Price'] - 20)), color=color,
@@ -190,8 +190,8 @@ class Market_regime:
                     ax[0].annotate(text, xy=(index, row['Price']), xytext=(index - datetime.timedelta(days=10), (row['Price'] + 20 - offset_value)), color=color,
                                    arrowprops=dict(arrowstyle="->", connectionstyle="angle3,angleA=0,angleB=90", color=color), fontsize=fontsize)
                 if not first_round and not pd.isnull(data_to_draw.loc[index]['OSV']):
-                    ax[0].annotate(data_to_draw.loc[index]['OSV'].round(decimals=2), xy=(index, row['Price']), xytext=(index - datetime.timedelta(days=55), (row['Price'] - 30)), color='#00B748',
-                                       arrowprops=dict(arrowstyle="->", connectionstyle="angle3,angleA=0,angleB=25", color='#00B748'), fontsize=fontsize)
+                    ax[0].annotate(data_to_draw.loc[index]['OSV'].round(decimals=2), xy=(index, row['Price']), xytext=(index - datetime.timedelta(days=55), (row['Price'] - 20)), color='#00B748',
+                                       arrowprops=dict(arrowstyle="->", connectionstyle="angle3,angleA=0,angleB=30", color='#00B748'), fontsize=fontsize)
             first_round = False
         ax[1].plot(data_to_draw['pct_change'], color='y',
                    linewidth=1.5, label='Price return')
