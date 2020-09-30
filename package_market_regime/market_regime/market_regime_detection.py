@@ -20,7 +20,7 @@ class Market_regime:
         self.data = data.rename(columns={columns[0]: 'Price'}, inplace=False)
         self.data_freq = data_freq
         # check if index is datetime index
-        if self.data.index.dtype == '<M8[ns]':
+        if not self.data.index.dtype.name.startswith('period'):
             self.data.index = pd.DatetimeIndex(
                 self.data.index).to_period(self.data_freq)
         self.data['pct_change'] = self.data['Price'].pct_change(n_pct_change)
@@ -42,8 +42,8 @@ class Market_regime:
                     if values['Price'] >= (self.DC_lowest_price['Price'] * (1 + current_offset_value)):
                         self.DC_event = 'uptrend'
                         self.data.loc[index, curent_offset_column] = 'Up'
-
-                        if self.data.isnull().loc[self.DC_lowest_price.name][curent_offset_column]:
+                        check_null_value = self.data.loc[self.DC_lowest_price.name][curent_offset_column]
+                        if check_null_value.isnull():
                             self.data.loc[self.DC_lowest_price.name,
                                           curent_offset_column] = 'DXP'
                         else:
@@ -69,8 +69,8 @@ class Market_regime:
                     if values['Price'] <= (self.DC_highest_price['Price'] * (1 - current_offset_value)):
                         self.DC_event = 'downtrend'
                         self.data.loc[index, curent_offset_column] = 'Down'
-                        
-                        if self.data.isnull().loc[self.DC_highest_price.name][curent_offset_column]:
+                        check_null_value = self.data.loc[self.DC_highest_price.name][curent_offset_column]
+                        if check_null_value.isnull():
                             self.data.loc[self.DC_highest_price.name,
                                           curent_offset_column] = 'UXP'
                         else:
@@ -131,9 +131,11 @@ class Market_regime:
         self.hmm_model_predict = self.hmm_model_fit.predict(hmm_data)
         return self
 
-    def plot_market_regime(self, figsize=(20, 12), day_interval=10, plot_hmm=False):
+    def plot_market_regime(self, figsize=(20, 12), day_interval=10, plot_hmm=False, timeFrame=None):
         data_to_draw = self.data
         data_to_draw.index = data_to_draw.index.to_timestamp()
+        if timeFrame:
+            data_to_draw = self.data.last(f'{timeFrame}M')
         if plot_hmm:
             try:
                 self.hmm_model_predict
@@ -159,6 +161,12 @@ class Market_regime:
         data_event_columns = self.data.filter(regex=("Event.*"))
         first_round = True
         fontsize = 7
+        if self.data_freq == 'D':
+            freq = 'days'
+        elif self.data_freq == 'H':
+            freq = 'hours'
+        elif self.data_freq == 'M':
+            freq = 'mintues'
         for column in data_event_columns:
             annotate_result = data_to_draw[self.data[column].notnull()]
             match = re.search(r'(Event_)([\w\.-]+)', column)
@@ -172,26 +180,30 @@ class Market_regime:
             for index, row in annotate_result.iterrows():
                 text = "%s^%s" % (row[column], superscript)
                 if row[column] == 'Down':
-                    ax[0].annotate(text, xy=(index, row['Price']), xytext=(index - datetime.timedelta(days=10), (row['Price'] + 20)), color=color,
+                    ax[0].annotate(text, xy=(index, row['Price']), xytext=(index - datetime.timedelta(**{freq :10}), (row['Price'] + 20)), color=color,
                                    arrowprops=dict(arrowstyle="->", connectionstyle="angle3,angleA=0,angleB=80", color=color), fontsize=fontsize)
                     if not first_round and data_to_draw.loc[index]['BBTheta'] is True:
-                        ax[0].annotate(data_to_draw.loc[index]['BBTheta'], xy=(index, row['Price']), xytext=(index + datetime.timedelta(days=30), (row['Price'] + 5)), color='#EA62EC',
+                        ax[0].annotate(data_to_draw.loc[index]['BBTheta'], xy=(index, row['Price']), xytext=(index + datetime.timedelta(**{freq :30}), (row['Price'] + 5)), color='#EA62EC',
                                        arrowprops=dict(arrowstyle="->", connectionstyle="angle3,angleA=0,angleB=70", color='#EA62EC'), fontsize=fontsize)
                 elif row[column] == 'Up':
                     ax[0].annotate(text, xy=(index, row['Price']), xytext=(index, (row['Price'] - 20)), color=color,
                                    arrowprops=dict(arrowstyle="->", connectionstyle="angle3,angleA=0,angleB=-60", color=color), fontsize=fontsize)
                     if not first_round and data_to_draw.loc[index]['BBTheta'] is True:
-                        ax[0].annotate(data_to_draw.loc[index]['BBTheta'], xy=(index, row['Price']), xytext=(index - datetime.timedelta(days=50), (row['Price'] - 25)), color='#EA62EC',
-                                       arrowprops=dict(arrowstyle="->", connectionstyle="angle3,angleA=0,angleB=40", color='#EA62EC'), fontsize=fontsize)
+                        ax[0].annotate(data_to_draw.loc[index]['BBTheta'], xy=(index, row['Price']), xytext=(index + datetime.timedelta(**{freq :50}), (row['Price'] - 25)), color='#EA62EC',
+                                       arrowprops=dict(arrowstyle="->", connectionstyle="angle3,angleA=0,angleB=110", color='#EA62EC'), fontsize=fontsize)
                 elif row[column] == 'DXP' or row[column] == 'Down+DXP':
-                    ax[0].annotate(text, xy=(index, row['Price']), xytext=(index - datetime.timedelta(days=10), (row['Price'] - 20 + offset_value)), color=color,
+                    ax[0].annotate(text, xy=(index, row['Price']), xytext=(index - datetime.timedelta(**{freq :10}), (row['Price'] - 20 + offset_value)), color=color,
                                    arrowprops=dict(arrowstyle="->", connectionstyle="angle3,angleA=0,angleB=90", color=color), fontsize=fontsize)
                 elif row[column] == 'UXP' or row[column] == 'Up+UXP':
-                    ax[0].annotate(text, xy=(index, row['Price']), xytext=(index - datetime.timedelta(days=10), (row['Price'] + 20 - offset_value)), color=color,
+                    ax[0].annotate(text, xy=(index, row['Price']), xytext=(index - datetime.timedelta(**{freq :10}), (row['Price'] + 20 - offset_value)), color=color,
                                    arrowprops=dict(arrowstyle="->", connectionstyle="angle3,angleA=0,angleB=90", color=color), fontsize=fontsize)
                 if not first_round and not pd.isnull(data_to_draw.loc[index]['OSV']):
-                    ax[0].annotate(data_to_draw.loc[index]['OSV'].round(decimals=2), xy=(index, row['Price']), xytext=(index - datetime.timedelta(days=55), (row['Price'] - 20)), color='#00B748',
-                                       arrowprops=dict(arrowstyle="->", connectionstyle="angle3,angleA=0,angleB=30", color='#00B748'), fontsize=fontsize)
+                    if row[column] == 'Down':
+                        ax[0].annotate(data_to_draw.loc[index]['OSV'].round(decimals=2), xy=(index, row['Price']), xytext=(index - datetime.timedelta(**{freq :55}), (row['Price'] - 20)), color='#00B748',
+                                        arrowprops=dict(arrowstyle="->", connectionstyle="angle3,angleA=0,angleB=30", color='#00B748'), fontsize=fontsize)
+                    elif row[column] == 'Up':
+                        ax[0].annotate(data_to_draw.loc[index]['OSV'].round(decimals=2), xy=(index, row['Price']), xytext=(index + datetime.timedelta(**{freq :55}), (row['Price'] - 20)), color='#00B748',
+                                        arrowprops=dict(arrowstyle="->", connectionstyle="angle3,angleA=0,angleB=120", color='#00B748'), fontsize=fontsize)
             first_round = False
         ax[1].plot(data_to_draw['pct_change'], color='y',
                    linewidth=1.5, label='Price return')
