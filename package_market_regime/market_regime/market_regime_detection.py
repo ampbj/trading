@@ -42,8 +42,9 @@ class Market_regime:
                     if values['Price'] >= (self.DC_lowest_price['Price'] * (1 + current_offset_value)):
                         self.DC_event = 'uptrend'
                         self.data.loc[index, curent_offset_column] = 'Up'
-                        check_null_value = self.data.loc[self.DC_lowest_price.name][curent_offset_column]
-                        if check_null_value.isnull():
+                        check_null_value = self.data.isnull(
+                        ).loc[self.DC_lowest_price.name][curent_offset_column]
+                        if check_null_value:
                             self.data.loc[self.DC_lowest_price.name,
                                           curent_offset_column] = 'DXP'
                         else:
@@ -51,10 +52,11 @@ class Market_regime:
                                           curent_offset_column] = 'Down+DXP'
 
                         if item_number == 1:
-                            #OSV discovery
-                            osv_value = self.OSV(self.DC_lowest_price.name,dc_offset[0], 'Down')
+                            # OSV discovery
+                            osv_value = self.OSV(
+                                self.DC_lowest_price.name, dc_offset[0], 'Down')
                             self.data.loc[index, 'OSV'] = osv_value
-                            #BBTheta boolean value discovery
+                            # BBTheta boolean value discovery
                             dc_current_lowest_price = self.data.loc[
                                 self.DC_lowest_price.name][f"Event_{dc_offset[0]}"]
                             if dc_current_lowest_price == 'DXP' or dc_current_lowest_price == 'Down+DXP':
@@ -69,8 +71,9 @@ class Market_regime:
                     if values['Price'] <= (self.DC_highest_price['Price'] * (1 - current_offset_value)):
                         self.DC_event = 'downtrend'
                         self.data.loc[index, curent_offset_column] = 'Down'
-                        check_null_value = self.data.loc[self.DC_highest_price.name][curent_offset_column]
-                        if check_null_value.isnull():
+                        check_null_value = self.data.isnull(
+                        ).loc[self.DC_highest_price.name][curent_offset_column]
+                        if check_null_value:
                             self.data.loc[self.DC_highest_price.name,
                                           curent_offset_column] = 'UXP'
                         else:
@@ -78,12 +81,13 @@ class Market_regime:
                                           curent_offset_column] = 'Up+UXP'
 
                         if item_number == 1:
-                            #OSV discovery
-                            osv_value = self.OSV(self.DC_highest_price.name,dc_offset[0], 'Up')
+                            # OSV discovery
+                            osv_value = self.OSV(
+                                self.DC_highest_price.name, dc_offset[0], 'Up')
                             self.data.loc[index, 'OSV'] = osv_value
-                            #BBTheta boolean value discovery
+                            # BBTheta boolean value discovery
                             dc_current_highest_price = self.data.loc[
-                            self.DC_highest_price.name][f"Event_{dc_offset[0]}"]
+                                self.DC_highest_price.name][f"Event_{dc_offset[0]}"]
                             if dc_current_highest_price == 'UXP' or dc_current_highest_price == 'Up+UXP':
                                 self.data.loc[index, 'BBTheta'] = True
 
@@ -103,16 +107,17 @@ class Market_regime:
         STheta_extreme_price = self.data.loc[STheta_extreme_index]['Price']
         BTheta_column = f"Event_{BTheta}"
         BTheta_rows = self.data[self.data.index <= STheta_extreme_index]
-        BTheta_rows = BTheta_rows[BTheta_rows[BTheta_column].notnull()][BTheta_column]
+        BTheta_rows = BTheta_rows[BTheta_rows[BTheta_column].notnull(
+        )][BTheta_column]
         if not BTheta_rows.empty:
             for index, row in BTheta_rows[::-1].iteritems():
                 if row == direction or row == alternate_direction_value:
                     PDCC_BTheta = self.data.loc[index]['Price']
-                    OSV = ((STheta_extreme_price - PDCC_BTheta) / PDCC_BTheta) / BTheta
+                    OSV = ((STheta_extreme_price - PDCC_BTheta) /
+                           PDCC_BTheta) / BTheta
                     return OSV
         else:
             return
-
 
     def markov_switching_regression_fit(self, k_regimes=3, summary=False, expected_duration=False):
         self.Markov_switching_model = sm.tsa.MarkovRegression(self.data['pct_change'].dropna(), k_regimes=k_regimes,
@@ -131,12 +136,20 @@ class Market_regime:
         self.hmm_model_predict = self.hmm_model_fit.predict(hmm_data)
         return self
 
-    def plot_market_regime(self, figsize=(20, 12), day_interval=10, plot_hmm=False, timeFrame=None):
+    def plot_market_regime(self, figsize=(20, 12), day_interval=10, plot_hmm=False, timeFrame=None, no_markov=False):
         data_to_draw = self.data
         data_to_draw.index = data_to_draw.index.to_timestamp()
+
+        #figuring out how much to space arrows in annotations out:
+        duration = (data_to_draw.index[-1].date() - data_to_draw.index[0].date()).days / 365
+
         if timeFrame:
             data_to_draw = self.data.last(f'{timeFrame}M')
-        if plot_hmm:
+        if no_markov:
+            nrows = 2
+            _, ax = plt.subplots(nrows=nrows, sharex=True, figsize=figsize, gridspec_kw={
+                                 'height_ratios': [5, 2]})
+        elif plot_hmm:
             try:
                 self.hmm_model_predict
             except AttributeError:
@@ -172,45 +185,57 @@ class Market_regime:
             match = re.search(r'(Event_)([\w\.-]+)', column)
             superscript = match.group(2)
             if first_round:
-                color = 'red'
-                offset_value = 2
+                color = '#EA62EC'
+                offset_value = 3
             else:
                 color = '#42AFD8'
-                offset_value = 10
+                offset_value = 9
             for index, row in annotate_result.iterrows():
                 text = "%s^%s" % (row[column], superscript)
                 if row[column] == 'Down':
-                    ax[0].annotate(text, xy=(index, row['Price']), xytext=(index - datetime.timedelta(**{freq :10}), (row['Price'] + 20)), color=color,
+                    ax[0].annotate(text, xy=(index, row['Price']), xytext=(index - datetime.timedelta(**{freq: 15}), (row['Price'] + 15)), color=color,
                                    arrowprops=dict(arrowstyle="->", connectionstyle="angle3,angleA=0,angleB=80", color=color), fontsize=fontsize)
-                    if not first_round and data_to_draw.loc[index]['BBTheta'] is True:
-                        ax[0].annotate(data_to_draw.loc[index]['BBTheta'], xy=(index, row['Price']), xytext=(index + datetime.timedelta(**{freq :30}), (row['Price'] + 5)), color='#EA62EC',
-                                       arrowprops=dict(arrowstyle="->", connectionstyle="angle3,angleA=0,angleB=70", color='#EA62EC'), fontsize=fontsize)
+                    if not first_round:
+                        downText = ''
+                        if data_to_draw.loc[index]['BBTheta'] is True:
+                            downText = str(data_to_draw.loc[index]['BBTheta'])
+                        if not pd.isnull(data_to_draw.loc[index]['OSV']):
+                            string = str(
+                                data_to_draw.loc[index]['OSV'].round(decimals=2))
+                            string += '--' + downText
+                            downText = string
+                        if downText:
+                            ax[0].annotate(downText, xy=(index, row['Price']), xytext=(index - datetime.timedelta(**{freq: 55}), (row['Price'] - 25)), color='#00B748',
+                                           arrowprops=dict(arrowstyle="->", connectionstyle="angle3,angleA=0,angleB=45", color='#00B748'), fontsize=fontsize)
                 elif row[column] == 'Up':
-                    ax[0].annotate(text, xy=(index, row['Price']), xytext=(index, (row['Price'] - 20)), color=color,
+                    ax[0].annotate(text, xy=(index, row['Price']), xytext=(index - datetime.timedelta(**{freq: 10}), (row['Price'] - 20)), color=color,
                                    arrowprops=dict(arrowstyle="->", connectionstyle="angle3,angleA=0,angleB=-60", color=color), fontsize=fontsize)
-                    if not first_round and data_to_draw.loc[index]['BBTheta'] is True:
-                        ax[0].annotate(data_to_draw.loc[index]['BBTheta'], xy=(index, row['Price']), xytext=(index + datetime.timedelta(**{freq :50}), (row['Price'] - 25)), color='#EA62EC',
-                                       arrowprops=dict(arrowstyle="->", connectionstyle="angle3,angleA=0,angleB=110", color='#EA62EC'), fontsize=fontsize)
+                    if not first_round:
+                        upText = ''
+                        if data_to_draw.loc[index]['BBTheta'] is True:
+                            upText = str(data_to_draw.loc[index]['BBTheta'])
+                        if not pd.isnull(data_to_draw.loc[index]['OSV']):
+                            string = str(
+                                data_to_draw.loc[index]['OSV'].round(decimals=2))
+                            string += '--' + upText
+                            upText = string
+                        if upText:
+                            ax[0].annotate(upText, xy=(index, row['Price']), xytext=(index + datetime.timedelta(**{freq: 40}), (row['Price'] - 20)), color='#00B748',
+                                           arrowprops=dict(arrowstyle="->", connectionstyle="angle3,angleA=0,angleB=145", color='#00B748'), fontsize=fontsize)
                 elif row[column] == 'DXP' or row[column] == 'Down+DXP':
-                    ax[0].annotate(text, xy=(index, row['Price']), xytext=(index - datetime.timedelta(**{freq :10}), (row['Price'] - 20 + offset_value)), color=color,
+                    ax[0].annotate(text, xy=(index, row['Price']), xytext=(index - datetime.timedelta(**{freq: 30}), (row['Price'] - 20 + offset_value)), color=color,
                                    arrowprops=dict(arrowstyle="->", connectionstyle="angle3,angleA=0,angleB=90", color=color), fontsize=fontsize)
                 elif row[column] == 'UXP' or row[column] == 'Up+UXP':
-                    ax[0].annotate(text, xy=(index, row['Price']), xytext=(index - datetime.timedelta(**{freq :10}), (row['Price'] + 20 - offset_value)), color=color,
+                    ax[0].annotate(text, xy=(index, row['Price']), xytext=(index - datetime.timedelta(**{freq: 30}), (row['Price'] + 20 - offset_value)), color=color,
                                    arrowprops=dict(arrowstyle="->", connectionstyle="angle3,angleA=0,angleB=90", color=color), fontsize=fontsize)
-                if not first_round and not pd.isnull(data_to_draw.loc[index]['OSV']):
-                    if row[column] == 'Down':
-                        ax[0].annotate(data_to_draw.loc[index]['OSV'].round(decimals=2), xy=(index, row['Price']), xytext=(index - datetime.timedelta(**{freq :55}), (row['Price'] - 20)), color='#00B748',
-                                        arrowprops=dict(arrowstyle="->", connectionstyle="angle3,angleA=0,angleB=30", color='#00B748'), fontsize=fontsize)
-                    elif row[column] == 'Up':
-                        ax[0].annotate(data_to_draw.loc[index]['OSV'].round(decimals=2), xy=(index, row['Price']), xytext=(index + datetime.timedelta(**{freq :55}), (row['Price'] - 20)), color='#00B748',
-                                        arrowprops=dict(arrowstyle="->", connectionstyle="angle3,angleA=0,angleB=120", color='#00B748'), fontsize=fontsize)
             first_round = False
         ax[1].plot(data_to_draw['pct_change'], color='y',
                    linewidth=1.5, label='Price return')
-        markov_result = self.Markov_switching_model.smoothed_marginal_probabilities
-        markov_result.index = markov_result.index.to_timestamp()
-        [ax[i].plot(markov_result[i-2], color='y',
-                    label=f'volatility {i-2}') for i in range(2, 5)]
+        if not no_markov:
+            markov_result = self.Markov_switching_model.smoothed_marginal_probabilities
+            markov_result.index = markov_result.index.to_timestamp()
+            [ax[i].plot(markov_result[i-2], color='y',
+                        label=f'volatility {i-2}') for i in range(2, 5)]
         if plot_hmm:
             index_hmmlearn_offset = len(
                 self.data.index) - len(self.hmm_model_predict)
