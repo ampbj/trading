@@ -12,7 +12,7 @@ np.random.seed(42)
 
 
 class Market_regime:
-    def __init__(self, data, data_freq='D', n_pct_change=1):
+    def __init__(self, data, data_freq='d', n_pct_change=1):
         columns = data.columns
         if len(columns) > 1:
             raise Exception(
@@ -23,6 +23,9 @@ class Market_regime:
         # check if index is object
         if self.data.index.dtype.name == 'object':
             self.data.index = pd.to_datetime(self.data.index)
+        # if not pd.infer_freq(self.data):
+        #     if self.data_freq == 'm':
+        #         self.data = self.data.asfreq('60S', method='ffill')
         self.data['pct_change'] = self.data['Price'].pct_change(n_pct_change)
 
     def directional_change_fit(self, dc_offset=[0.1, 0.2]):
@@ -120,11 +123,11 @@ class Market_regime:
             return
 
     def markov_switching_regression_fit(self, k_regimes=3, summary=False, expected_duration=False):
-        index_changed = False
-        if not self.data.index.dtype.name.startswith('period'):
-            self.data.index = pd.DatetimeIndex(
-                self.data.index).to_period(self.data_freq)
-            index_changed = True
+        # data_to_fit = self.data.copy()
+        # if not data_to_fit.index.dtype.name.startswith('period'):
+        #     data_to_fit.index = pd.DatetimeIndex(
+        #         data_to_fit.index).to_period(self.data_freq)
+
         self.Markov_switching_model = sm.tsa.MarkovRegression(self.data['pct_change'].dropna(), k_regimes=k_regimes,
                                                               trend='nc', switching_variance=True).fit()
         if expected_duration:
@@ -132,8 +135,6 @@ class Market_regime:
                   self.Markov_switching_model.expected_durations)
         if summary:
             print(self.Markov_switching_model.summary())
-        if index_changed:
-            self.data.index = self.data.index.to_timestamp()
         return self
 
     def hidden_markov_model_fit(self, n_components=3, n_iter=100):
@@ -182,7 +183,7 @@ class Market_regime:
                    linewidth=1.5, label='Price return')
         if not no_markov:
             markov_result = self.Markov_switching_model.smoothed_marginal_probabilities
-            markov_result.index = markov_result.index.to_timestamp()
+            #markov_result.index = markov_result.index.to_timestamp()
             [ax[i].plot(markov_result[i-2], color='y',
                         label=f'volatility {i-2}') for i in range(2, 5)]
         if plot_hmm:
@@ -201,15 +202,15 @@ class Market_regime:
         first_round = True
         fontsize = 7
 
-        if self.data_freq == 'D':
+        if self.data_freq == 'd':
             freq = 'days'
             duration = min(math.floor(
                 (data_to_draw.index[-1].date() - data_to_draw.index[0].date()).days / 90), 6)
-        elif self.data_freq == 'H':
+        elif self.data_freq == 'h':
             freq = 'hours'
             duration = min(math.floor(
                 (data_to_draw.index[-1].date() - data_to_draw.index[0].date()).days / 90), 6)
-        elif self.data_freq == 'M':
+        elif self.data_freq == 'm':
             freq = 'minutes'
             duration = max(1, min(math.floor(
                 (data_to_draw.index[-1].date() - data_to_draw.index[0].date()).days / 7), 6))
@@ -224,7 +225,7 @@ class Market_regime:
             else:
                 color = '#42AFD8'
                 offset_value = 5
-            if self.data_freq == 'M':
+            if self.data_freq == 'm':
                 offset_value /= 10
             for index, row in annotate_result.iterrows():
                 text = "%s^%s" % (row[column], superscript)
