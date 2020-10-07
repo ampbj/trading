@@ -20,10 +20,9 @@ class Market_regime:
         pd.plotting.register_matplotlib_converters()
         self.data = data.rename(columns={columns[0]: 'Price'}, inplace=False)
         self.data_freq = data_freq
-        # check if index is datetime index
-        if not self.data.index.dtype.name.startswith('period'):
-            self.data.index = pd.DatetimeIndex(
-                self.data.index).to_period(self.data_freq)
+        # check if index is object
+        if self.data.index.dtype.name == 'object':
+            self.data.index = pd.to_datetime(self.data.index)
         self.data['pct_change'] = self.data['Price'].pct_change(n_pct_change)
 
     def directional_change_fit(self, dc_offset=[0.1, 0.2]):
@@ -121,6 +120,11 @@ class Market_regime:
             return
 
     def markov_switching_regression_fit(self, k_regimes=3, summary=False, expected_duration=False):
+        index_changed = False
+        if not self.data.index.dtype.name.startswith('period'):
+            self.data.index = pd.DatetimeIndex(
+                self.data.index).to_period(self.data_freq)
+            index_changed = True
         self.Markov_switching_model = sm.tsa.MarkovRegression(self.data['pct_change'].dropna(), k_regimes=k_regimes,
                                                               trend='nc', switching_variance=True).fit()
         if expected_duration:
@@ -128,6 +132,8 @@ class Market_regime:
                   self.Markov_switching_model.expected_durations)
         if summary:
             print(self.Markov_switching_model.summary())
+        if index_changed:
+            self.data.index = self.data.index.to_timestamp()
         return self
 
     def hidden_markov_model_fit(self, n_components=3, n_iter=100):
@@ -139,9 +145,7 @@ class Market_regime:
 
     def plot_market_regime(self, figsize=(20, 12), day_interval=10, plot_hmm=False, no_markov=False):
         data_to_draw = self.data
-        data_to_draw.index = data_to_draw.index.to_timestamp()
-
-        #drawing boilderplate
+        # drawing boilderplate
         if no_markov:
             nrows = 2
             _, ax = plt.subplots(nrows=nrows, sharex=True, figsize=figsize, gridspec_kw={
@@ -168,10 +172,10 @@ class Market_regime:
          for i in range(nrows)]
         plt.xticks(rotation=90)
 
-        #drawing price graph
+        # drawing price graph
         ax[0].plot(data_to_draw['Price'], label='Price', color='w')
 
-        #annotate plot with DC info
+        # annotate plot with DC info
         self.annotate_plot(data_to_draw, ax[0])
 
         ax[1].plot(data_to_draw['pct_change'], color='y',
@@ -187,23 +191,28 @@ class Market_regime:
             ax[5].plot(data_to_draw.index[index_hmmlearn_offset:],
                        self.hmm_model_predict, color='y', label='Hmm')
         [ax[i].legend(loc="lower right", prop={'size': 6}) for i in range(2)]
-        [ax[i].legend(loc="upper left", prop={'size': 5}) for i in range(2, nrows)]
+        [ax[i].legend(loc="upper left", prop={'size': 5})
+         for i in range(2, nrows)]
         plt.show()
 
     def annotate_plot(self, data_to_draw, plot_to_annotate):
         data_event_columns = self.data.filter(regex=("Event.*"))
-        #figuring out how much to space arrows in annotations out:
-        duration = min(math.floor((data_to_draw.index[-1].date() - data_to_draw.index[0].date()).days / 90), 6)
-
+        # figuring out how much to space arrows in annotations out:
         first_round = True
         fontsize = 7
 
         if self.data_freq == 'D':
             freq = 'days'
+            duration = min(math.floor(
+                (data_to_draw.index[-1].date() - data_to_draw.index[0].date()).days / 90), 6)
         elif self.data_freq == 'H':
             freq = 'hours'
+            duration = min(math.floor(
+                (data_to_draw.index[-1].date() - data_to_draw.index[0].date()).days / 90), 6)
         elif self.data_freq == 'M':
-            freq = 'mintues'
+            freq = 'minutes'
+            duration = max(1, min(math.floor(
+                (data_to_draw.index[-1].date() - data_to_draw.index[0].date()).days / 7), 6))
 
         for column in data_event_columns:
             annotate_result = data_to_draw[self.data[column].notnull()]
@@ -211,15 +220,17 @@ class Market_regime:
             superscript = match.group(2)
             if first_round:
                 color = '#EA62EC'
-                offset_value = 3
+                offset_value = 1
             else:
                 color = '#42AFD8'
-                offset_value = 9
+                offset_value = 5
+            if self.data_freq == 'M':
+                offset_value /= 10
             for index, row in annotate_result.iterrows():
                 text = "%s^%s" % (row[column], superscript)
                 if row[column] == 'Down':
                     plot_to_annotate.annotate(text, xy=(index, row['Price']), xytext=(index - datetime.timedelta(**{freq: (duration * 2)}), (row['Price'] + (duration * 2))), color=color,
-                                   arrowprops=dict(arrowstyle="->", connectionstyle="angle3,angleA=0,angleB=80", color=color), fontsize=fontsize - 1)
+                                              arrowprops=dict(arrowstyle="->", connectionstyle="angle3,angleA=0,angleB=80", color=color), fontsize=fontsize - 1)
                     if not first_round:
                         downText = ''
                         if data_to_draw.loc[index]['BBTheta'] is True:
@@ -227,14 +238,15 @@ class Market_regime:
                         if not pd.isnull(data_to_draw.loc[index]['OSV']):
                             string = str(
                                 data_to_draw.loc[index]['OSV'].round(decimals=2))
-                            string += '--' + downText
+                            if downText:
+                                string += '--' + downText
                             downText = string
                         if downText:
-                            plot_to_annotate.annotate(downText, xy=(index, row['Price']), xytext=(index - datetime.timedelta(**{freq: (duration * 10)}), (row['Price'] - (duration * 2))), color='#00B748',
-                                           arrowprops=dict(arrowstyle="->", connectionstyle="angle3,angleA=0,angleB=45", color='#00B748'), fontsize=fontsize)
+                            plot_to_annotate.annotate(downText, xy=(index, row['Price']), xytext=(index - datetime.timedelta(**{freq: (duration * 10)}), (row['Price'] - (duration))), color='#00B748',
+                                                      arrowprops=dict(arrowstyle="->", connectionstyle="angle3,angleA=0,angleB=40", color='#00B748'), fontsize=fontsize)
                 elif row[column] == 'Up':
                     plot_to_annotate.annotate(text, xy=(index, row['Price']), xytext=(index + datetime.timedelta(**{freq: (duration * 1)}), (row['Price'] - (duration * 2))), color=color,
-                                   arrowprops=dict(arrowstyle="->", connectionstyle="angle3,angleA=0,angleB=-60", color=color), fontsize=fontsize - 1)
+                                              arrowprops=dict(arrowstyle="->", connectionstyle="angle3,angleA=0,angleB=-60", color=color), fontsize=fontsize - 1)
                     if not first_round:
                         upText = ''
                         if data_to_draw.loc[index]['BBTheta'] is True:
@@ -242,16 +254,17 @@ class Market_regime:
                         if not pd.isnull(data_to_draw.loc[index]['OSV']):
                             string = str(
                                 data_to_draw.loc[index]['OSV'].round(decimals=2))
-                            string += '--' + upText
+                            if upText:
+                                string += '--' + upText
                             upText = string
                         if upText:
-                            plot_to_annotate.annotate(upText, xy=(index, row['Price']), xytext=(index + datetime.timedelta(**{freq: (duration * 9)}), (row['Price'] - (duration * 2))), color='#00B748',
-                                           arrowprops=dict(arrowstyle="->", connectionstyle="angle3,angleA=0,angleB=145", color='#00B748'), fontsize=fontsize)
+                            plot_to_annotate.annotate(upText, xy=(index, row['Price']), xytext=(index - datetime.timedelta(**{freq: (duration * 10)}), (row['Price'] + (duration))), color='#00B748',
+                                                      arrowprops=dict(arrowstyle="->", connectionstyle="angle3,angleA=0,angleB=120", color='#00B748'), fontsize=fontsize)
                 elif row[column] == 'DXP' or row[column] == 'Down+DXP':
-                    plot_to_annotate.annotate(text, xy=(index, row['Price']), xytext=(index - datetime.timedelta(**{freq: (duration * 4)}), (row['Price'] - (duration * 2) + offset_value)), color=color,
-                                   arrowprops=dict(arrowstyle="->", connectionstyle="angle3,angleA=0,angleB=90", color=color), fontsize=fontsize)
+                    plot_to_annotate.annotate(text, xy=(index, row['Price']), xytext=(index - datetime.timedelta(**{freq: (duration * 4)}), (row['Price'] - (duration * 2) - offset_value)), color=color,
+                                              arrowprops=dict(arrowstyle="->", connectionstyle="angle3,angleA=0,angleB=90", color=color), fontsize=fontsize)
                 elif row[column] == 'UXP' or row[column] == 'Up+UXP':
-                    plot_to_annotate.annotate(text, xy=(index, row['Price']), xytext=(index - datetime.timedelta(**{freq: (duration * 4)}), (row['Price'] + (duration * 2) - offset_value)), color=color,
-                                   arrowprops=dict(arrowstyle="->", connectionstyle="angle3,angleA=0,angleB=90", color=color), fontsize=fontsize)
+                    plot_to_annotate.annotate(text, xy=(index, row['Price']), xytext=(index - datetime.timedelta(**{freq: (duration * 4)}), (row['Price'] + (duration * 2) + offset_value)), color=color,
+                                              arrowprops=dict(arrowstyle="->", connectionstyle="angle3,angleA=0,angleB=90", color=color), fontsize=fontsize)
             first_round = False
         return None
