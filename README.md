@@ -1,7 +1,11 @@
 ## This repository contains all the packages required for trading.
 
 ### Steps followed in this repository are:
-	- Market regime detetction based on : 'Bakhach, A., Tsang, E. P. K. and Jalalian, H. (2016) Forecasting directional changes in the fx markets. In 2016 IEEE Symposium Series on Computational Intelligence (SSCI), 1–8.'
-	- Generating virtual scenarios of multivariate financial data for quantitative trading applications (Javier Franco-Pedroso 2018)
-	- Enriching Financial Datasets with Generative Adversarial Networks               (Fernando de Meer Pardo 2019)
+	- Market regime detetction based on : 'Bakhach, A., Tsang, E. P. K. and Jalalian, H. 
+	  (2016) Forecasting directional changes in the fx markets. 
+	  In 2016 IEEE Symposium Series on Computational Intelligence (SSCI), 1–8.'
+	- Generating virtual scenarios of multivariate financial data for quantitative trading applications 
+	  (Javier Franco-Pedroso 2018)
+	- Enriching Financial Datasets with Generative Adversarial Networks 
+	  (Fernando de Meer Pardo 2019)
 	- Tactical Investment Algorithms (Marcos López de Prado Sep 2019)
