@@ -25,9 +25,9 @@ class Market_regime:
             self.data.index = pd.to_datetime(self.data.index)
         if not pd.infer_freq(self.data):
             if self.data_freq == 'd':
-                frequency ='B'
+                frequency = 'B'
             elif self.data_freq == 'h':
-                frequency ='BH'
+                frequency = 'BH'
             elif self.data_freq == 'm':
                 frequency = 'T'
             self.data = self.data.asfreq(frequency, method='ffill')
@@ -69,6 +69,8 @@ class Market_regime:
                                 self.DC_lowest_price.name][f"Event_{dc_offset[0]}"]
                             if dc_current_lowest_price == 'DXP' or dc_current_lowest_price == 'Down+DXP':
                                 self.data.loc[index, 'BBTheta'] = True
+                            else:
+                                self.data.loc[index, 'BBTheta'] = False
 
                         self.DC_highest_price = values
 
@@ -98,6 +100,8 @@ class Market_regime:
                                 self.DC_highest_price.name][f"Event_{dc_offset[0]}"]
                             if dc_current_highest_price == 'UXP' or dc_current_highest_price == 'Up+UXP':
                                 self.data.loc[index, 'BBTheta'] = True
+                            else:
+                                self.data.loc[index, 'BBTheta'] = False
 
                         self.DC_lowest_price = values
 
@@ -149,20 +153,20 @@ class Market_regime:
         # drawing boilderplate
         if no_markov:
             nrows = 2
-            _, ax = plt.subplots(nrows=nrows, sharex=True, figsize=figsize, gridspec_kw={
-                                 'height_ratios': [5, 2]})
+            fig, ax = plt.subplots(nrows=nrows, sharex=True, figsize=figsize, gridspec_kw={
+                'height_ratios': [5, 2]})
         elif plot_hmm:
             try:
                 self.hmm_model_predict
             except AttributeError:
                 print('Run hidden_markov_model_fit first!')
             nrows = 6
-            _, ax = plt.subplots(nrows=nrows, sharex=True, figsize=figsize, gridspec_kw={
-                                 'height_ratios': [5, 2, 1, 1, 1, 1]})
+            fig, ax = plt.subplots(nrows=nrows, sharex=True, figsize=figsize, gridspec_kw={
+                'height_ratios': [5, 2, 1, 1, 1, 1]})
         else:
             nrows = 5
-            _, ax = plt.subplots(nrows=nrows, sharex=True, figsize=figsize, gridspec_kw={
-                                 'height_ratios': [5, 2, 1, 1, 1]})
+            fig, ax = plt.subplots(nrows=nrows, sharex=True, figsize=figsize, gridspec_kw={
+                'height_ratios': [5, 2, 1, 1, 1]})
         [ax[i].cla() for i in range(nrows)]
         [ax[i].set_facecolor('k') for i in range(nrows)]
         [ax[i].xaxis.set_major_locator(dates.DayLocator(
@@ -228,12 +232,16 @@ class Market_regime:
                 offset_value /= 10
             for index, row in annotate_result.iterrows():
                 text = "%s^%s" % (row[column], superscript)
-                if row[column] == 'Down':
-                    plot_to_annotate.annotate(text, xy=(index, row['Price']), xytext=(index - datetime.timedelta(**{freq: (duration * 2)}), (row['Price'] + (duration * 2))), color=color,
-                                              arrowprops=dict(arrowstyle="->", connectionstyle="angle3,angleA=0,angleB=80", color=color), fontsize=fontsize - 1)
+                if row[column] == 'Down' or row[column] == 'Down+DXP' or row[column] == 'DXP':
+                    if row[column] == 'Down':
+                        plot_to_annotate.annotate(text, xy=(index, row['Price']), xytext=(index - datetime.timedelta(**{freq: (duration * 2)}), (row['Price'] + (duration * 2))), color=color,
+                                                  arrowprops=dict(arrowstyle="->", connectionstyle="angle3,angleA=0,angleB=80", color=color), fontsize=fontsize - 1)
+                    if row[column] == 'Down+DXP' or row[column] == 'DXP':
+                        plot_to_annotate.annotate(text, xy=(index, row['Price']), xytext=(index - datetime.timedelta(**{freq: (duration * 4)}), (row['Price'] - (duration * 2) - offset_value)), color=color,
+                                                  arrowprops=dict(arrowstyle="->", connectionstyle="angle3,angleA=0,angleB=90", color=color), fontsize=fontsize)
                     if not first_round:
                         downText = ''
-                        if data_to_draw.loc[index]['BBTheta'] is True:
+                        if not math.isnan(data_to_draw.loc[index]['BBTheta']):
                             downText = str(data_to_draw.loc[index]['BBTheta'])
                         if not pd.isnull(data_to_draw.loc[index]['OSV']):
                             string = str(
@@ -244,12 +252,16 @@ class Market_regime:
                         if downText:
                             plot_to_annotate.annotate(downText, xy=(index, row['Price']), xytext=(index - datetime.timedelta(**{freq: (duration * 10)}), (row['Price'] - (duration))), color='#00B748',
                                                       arrowprops=dict(arrowstyle="->", connectionstyle="angle3,angleA=0,angleB=40", color='#00B748'), fontsize=fontsize)
-                elif row[column] == 'Up':
-                    plot_to_annotate.annotate(text, xy=(index, row['Price']), xytext=(index + datetime.timedelta(**{freq: (duration * 1)}), (row['Price'] - (duration * 2))), color=color,
-                                              arrowprops=dict(arrowstyle="->", connectionstyle="angle3,angleA=0,angleB=-60", color=color), fontsize=fontsize - 1)
+                elif row[column] == 'Up' or row[column] == 'Up+UXP' or row[column] == 'UXP' :
+                    if row[column] == 'Up':
+                        plot_to_annotate.annotate(text, xy=(index, row['Price']), xytext=(index + datetime.timedelta(**{freq: (duration * 1)}), (row['Price'] - (duration * 2))), color=color,
+                                                  arrowprops=dict(arrowstyle="->", connectionstyle="angle3,angleA=0,angleB=-60", color=color), fontsize=fontsize - 1)
+                    elif row[column] == 'Up+UXP' or row[column] == 'UXP':
+                        plot_to_annotate.annotate(text, xy=(index, row['Price']), xytext=(index - datetime.timedelta(**{freq: (duration * 4)}), (row['Price'] + (duration * 2) + offset_value)), color=color,
+                                                  arrowprops=dict(arrowstyle="->", connectionstyle="angle3,angleA=0,angleB=90", color=color), fontsize=fontsize)
                     if not first_round:
                         upText = ''
-                        if data_to_draw.loc[index]['BBTheta'] is True:
+                        if not math.isnan(data_to_draw.loc[index]['BBTheta']):
                             upText = str(data_to_draw.loc[index]['BBTheta'])
                         if not pd.isnull(data_to_draw.loc[index]['OSV']):
                             string = str(
@@ -260,11 +272,5 @@ class Market_regime:
                         if upText:
                             plot_to_annotate.annotate(upText, xy=(index, row['Price']), xytext=(index - datetime.timedelta(**{freq: (duration * 10)}), (row['Price'] + (duration))), color='#00B748',
                                                       arrowprops=dict(arrowstyle="->", connectionstyle="angle3,angleA=0,angleB=120", color='#00B748'), fontsize=fontsize)
-                elif row[column] == 'DXP' or row[column] == 'Down+DXP':
-                    plot_to_annotate.annotate(text, xy=(index, row['Price']), xytext=(index - datetime.timedelta(**{freq: (duration * 4)}), (row['Price'] - (duration * 2) - offset_value)), color=color,
-                                              arrowprops=dict(arrowstyle="->", connectionstyle="angle3,angleA=0,angleB=90", color=color), fontsize=fontsize)
-                elif row[column] == 'UXP' or row[column] == 'Up+UXP':
-                    plot_to_annotate.annotate(text, xy=(index, row['Price']), xytext=(index - datetime.timedelta(**{freq: (duration * 4)}), (row['Price'] + (duration * 2) + offset_value)), color=color,
-                                              arrowprops=dict(arrowstyle="->", connectionstyle="angle3,angleA=0,angleB=90", color=color), fontsize=fontsize)
             first_round = False
         return None

@@ -16,6 +16,6 @@ if not long_term:
         MR.plot_market_regime(day_interval=1, no_markov=False, plot_hmm=True)
 
 else:
-        data = DataReader(secs, 'yahoo', '2017-12-01',str(datetime.date.today()))['Adj Close']
+        data = DataReader(secs, 'yahoo', '2010-12-01',str(datetime.date.today()))['Adj Close']
         MR = mrd(data, data_freq='d').directional_change_fit(dc_offset=[0.1, 0.2]).markov_switching_regression_fit().hidden_markov_model_fit()
         MR.plot_market_regime(day_interval=20, no_markov=False, plot_hmm=True)
