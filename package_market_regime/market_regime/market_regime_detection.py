@@ -8,6 +8,7 @@ from matplotlib import dates
 import statsmodels.api as sm
 import re
 import math
+import pickle
 np.random.seed(42)
 
 
@@ -132,23 +133,31 @@ class Market_regime:
             return
 
     def markov_switching_regression_fit(self, k_regimes=3, summary=False, expected_duration=False):
-        self.Markov_switching_model = sm.tsa.MarkovRegression(self.data['pct_change'].dropna(), k_regimes=k_regimes,
-                                                              trend='nc', switching_variance=True).fit()
-        if expected_duration:
-            print('expected durations:',
-                  self.Markov_switching_model.expected_durations)
-        if summary:
-            print(self.Markov_switching_model.summary())
-        return self
+        try:
+
+            self.Markov_switching_model = sm.tsa.MarkovRegression(self.data['pct_change'].dropna(), k_regimes=k_regimes,
+                                                                trend='nc', switching_variance=True).fit()
+            if expected_duration:
+                print('expected durations:',
+                    self.Markov_switching_model.expected_durations)
+            if summary:
+                print(self.Markov_switching_model.summary())
+            return self
+
+        except:
+            pass
 
     def hidden_markov_model_fit(self, n_components=3, n_iter=100):
-        hmm_data = self.data['pct_change'].dropna().values.reshape(-1, 1)
-        self.hmm_model_fit = hmm.GaussianHMM(
-            n_components=n_components, covariance_type="full", n_iter=n_iter).fit(hmm_data)
-        self.hmm_model_predict = self.hmm_model_fit.predict(hmm_data)
-        return self
+        try:
+            hmm_data = self.data['pct_change'].dropna().values.reshape(-1, 1)
+            self.hmm_model_fit = hmm.GaussianHMM(
+                n_components=n_components, covariance_type="full", n_iter=n_iter).fit(hmm_data)
+            self.hmm_model_predict = self.hmm_model_fit.predict(hmm_data)
+            return self
+        except:
+            pass
 
-    def plot_market_regime(self, figsize=(20, 12), day_interval=10, plot_hmm=False, no_markov=False):
+    def plot_market_regime(self, figsize=(20, 12), day_interval=10, plot_hmm=False, no_markov=False, save_pic=''):
         data_to_draw = self.data
         # drawing boilderplate
         if no_markov:
@@ -197,7 +206,10 @@ class Market_regime:
         [ax[i].legend(loc="lower right", prop={'size': 6}) for i in range(2)]
         [ax[i].legend(loc="upper left", prop={'size': 5})
          for i in range(2, nrows)]
-        plt.show()
+        if save_pic:
+            pickle.dump(fig,  open(f'{save_pic}.pickle','wb'))
+        else:
+            plt.show()
 
     def annotate_plot(self, data_to_draw, plot_to_annotate):
         data_event_columns = self.data.filter(regex=("Event.*"))
@@ -214,9 +226,11 @@ class Market_regime:
             duration = min(math.floor(
                 (data_to_draw.index[-1].date() - data_to_draw.index[0].date()).days / 90), 6)
         elif self.data_freq == 'm':
+            one_day = 60 * 24
             freq = 'minutes'
-            duration = max(1, min(math.floor(
-                (data_to_draw.index[-1].date() - data_to_draw.index[0].date()).days / 7), 6))
+            length = len(data_to_draw) 
+            duration = min(math.ceil(one_day / length), 0.001)
+            offset_value_reduction = max((1/duration),10)
 
         for column in data_event_columns:
             annotate_result = data_to_draw[self.data[column].notnull()]
@@ -229,7 +243,7 @@ class Market_regime:
                 color = '#42AFD8'
                 offset_value = 5
             if self.data_freq == 'm':
-                offset_value /= 10
+                offset_value /= offset_value_reduction
             for index, row in annotate_result.iterrows():
                 text = "%s^%s" % (row[column], superscript)
                 if row[column] == 'Down' or row[column] == 'Down+DXP' or row[column] == 'DXP':
