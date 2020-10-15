@@ -9,6 +9,8 @@ import statsmodels.api as sm
 import re
 import math
 import pickle
+import traceback
+from market_regime.directional_change_fit import fit
 np.random.seed(42)
 
 
@@ -39,6 +41,7 @@ class Market_regime:
         dc_offset.reverse()
         self.data['BBTheta'] = pd.Series('bool')
         self.data['OSV'] = pd.Series('float')
+        last_round = len(dc_offset) - 1
         for item_number in range(len(dc_offset)):
             current_offset_value = dc_offset[item_number]
             curent_offset_column = f"Event_{current_offset_value}"
@@ -46,106 +49,24 @@ class Market_regime:
             self.DC_event = 'init'
             self.DC_highest_price = self.data.iloc[0]
             self.DC_lowest_price = self.data.iloc[0]
-            for index, values in self.data.iterrows():
-                if self.DC_event == 'downtrend' or self.DC_event == 'init':
-                    if values['Price'] >= (self.DC_lowest_price['Price'] * (1 + current_offset_value)):
-                        self.DC_event = 'uptrend'
-                        self.data.loc[index, curent_offset_column] = 'Up'
-                        check_null_value = self.data.isnull(
-                        ).loc[self.DC_lowest_price.name][curent_offset_column]
-                        if check_null_value:
-                            self.data.loc[self.DC_lowest_price.name,
-                                          curent_offset_column] = 'DXP'
-                        else:
-                            self.data.loc[self.DC_lowest_price.name,
-                                          curent_offset_column] = 'Down+DXP'
-
-                        if item_number == 1:
-                            # OSV discovery
-                            osv_value = self.OSV(
-                                self.DC_lowest_price.name, dc_offset[0], 'Down')
-                            self.data.loc[index, 'OSV'] = osv_value
-                            # BBTheta boolean value discovery
-                            dc_current_lowest_price = self.data.loc[
-                                self.DC_lowest_price.name][f"Event_{dc_offset[0]}"]
-                            if dc_current_lowest_price == 'DXP' or dc_current_lowest_price == 'Down+DXP':
-                                self.data.loc[index, 'BBTheta'] = True
-                            else:
-                                self.data.loc[index, 'BBTheta'] = False
-
-                        self.DC_highest_price = values
-
-                    if values['Price'] <= self.DC_lowest_price['Price']:
-                        self.DC_lowest_price = values
-
-                if self.DC_event == 'uptrend' or self.DC_event == 'init':
-                    if values['Price'] <= (self.DC_highest_price['Price'] * (1 - current_offset_value)):
-                        self.DC_event = 'downtrend'
-                        self.data.loc[index, curent_offset_column] = 'Down'
-                        check_null_value = self.data.isnull(
-                        ).loc[self.DC_highest_price.name][curent_offset_column]
-                        if check_null_value:
-                            self.data.loc[self.DC_highest_price.name,
-                                          curent_offset_column] = 'UXP'
-                        else:
-                            self.data.loc[self.DC_highest_price.name,
-                                          curent_offset_column] = 'Up+UXP'
-
-                        if item_number == 1:
-                            # OSV discovery
-                            osv_value = self.OSV(
-                                self.DC_highest_price.name, dc_offset[0], 'Up')
-                            self.data.loc[index, 'OSV'] = osv_value
-                            # BBTheta boolean value discovery
-                            dc_current_highest_price = self.data.loc[
-                                self.DC_highest_price.name][f"Event_{dc_offset[0]}"]
-                            if dc_current_highest_price == 'UXP' or dc_current_highest_price == 'Up+UXP':
-                                self.data.loc[index, 'BBTheta'] = True
-                            else:
-                                self.data.loc[index, 'BBTheta'] = False
-
-                        self.DC_lowest_price = values
-
-                    if values['Price'] >= self.DC_highest_price['Price']:
-                        self.DC_highest_price = values
-
+            is_last_round = item_number == last_round
+            self.data.apply(lambda row: fit(
+                self, row, current_offset_value, curent_offset_column, is_last_round), axis=1)
         return self
-
-    # Calculating OSV value as an independent variable used for prediction according to the paper
-    def OSV(self, STheta_extreme_index, BTheta, direction):
-        if direction == 'Down':
-            alternate_direction_value = 'Down+DXP'
-        if direction == 'Up':
-            alternate_direction_value = 'Up+UXP'
-        STheta_extreme_price = self.data.loc[STheta_extreme_index]['Price']
-        BTheta_column = f"Event_{BTheta}"
-        BTheta_rows = self.data[self.data.index <= STheta_extreme_index]
-        BTheta_rows = BTheta_rows[BTheta_rows[BTheta_column].notnull(
-        )][BTheta_column]
-        if not BTheta_rows.empty:
-            for index, row in BTheta_rows[::-1].iteritems():
-                if row == direction or row == alternate_direction_value:
-                    PDCC_BTheta = self.data.loc[index]['Price']
-                    OSV = ((STheta_extreme_price - PDCC_BTheta) /
-                           PDCC_BTheta) / BTheta
-                    return OSV
-        else:
-            return
 
     def markov_switching_regression_fit(self, k_regimes=3, summary=False, expected_duration=False):
         try:
-
             self.Markov_switching_model = sm.tsa.MarkovRegression(self.data['pct_change'].dropna(), k_regimes=k_regimes,
-                                                                trend='nc', switching_variance=True).fit()
+                                                                  trend='nc', switching_variance=True).fit()
             if expected_duration:
                 print('expected durations:',
-                    self.Markov_switching_model.expected_durations)
+                      self.Markov_switching_model.expected_durations)
             if summary:
                 print(self.Markov_switching_model.summary())
             return self
-
-        except:
-            pass
+        except Exception:
+            traceback.print_exc()
+            return self
 
     def hidden_markov_model_fit(self, n_components=3, n_iter=100):
         try:
@@ -154,8 +75,9 @@ class Market_regime:
                 n_components=n_components, covariance_type="full", n_iter=n_iter).fit(hmm_data)
             self.hmm_model_predict = self.hmm_model_fit.predict(hmm_data)
             return self
-        except:
-            pass
+        except Exception:
+            traceback.print_exc()
+            return self
 
     def plot_market_regime(self, figsize=(20, 12), day_interval=10, plot_hmm=False, no_markov=False, save_pic=''):
         data_to_draw = self.data
@@ -195,9 +117,13 @@ class Market_regime:
         ax[1].plot(data_to_draw['pct_change'], color='y',
                    linewidth=1.5, label='Price return')
         if not no_markov:
-            markov_result = self.Markov_switching_model.smoothed_marginal_probabilities
-            [ax[i].plot(markov_result[i-2], color='y',
-                        label=f'volatility {i-2}') for i in range(2, 5)]
+            try:
+                markov_result = self.Markov_switching_model.smoothed_marginal_probabilities
+                [ax[i].plot(markov_result[i-2], color='y',
+                            label=f'volatility {i-2}') for i in range(2, 5)]
+            except Exception:
+                traceback.print_exc()
+                pass
         if plot_hmm:
             index_hmmlearn_offset = len(
                 self.data.index) - len(self.hmm_model_predict)
@@ -207,7 +133,7 @@ class Market_regime:
         [ax[i].legend(loc="upper left", prop={'size': 5})
          for i in range(2, nrows)]
         if save_pic:
-            pickle.dump(fig,  open(f'{save_pic}.pickle','wb'))
+            pickle.dump(fig,  open(f'{save_pic}.pickle', 'wb'))
         else:
             plt.show()
 
@@ -228,9 +154,9 @@ class Market_regime:
         elif self.data_freq == 'm':
             one_day = 60 * 24
             freq = 'minutes'
-            length = len(data_to_draw) 
+            length = len(data_to_draw)
             duration = min(math.ceil(one_day / length), 0.001)
-            offset_value_reduction = max((1/duration),10)
+            offset_value_reduction = max((1/duration), 10)
 
         for column in data_event_columns:
             annotate_result = data_to_draw[self.data[column].notnull()]
@@ -266,7 +192,7 @@ class Market_regime:
                         if downText:
                             plot_to_annotate.annotate(downText, xy=(index, row['Price']), xytext=(index - datetime.timedelta(**{freq: (duration * 10)}), (row['Price'] - (duration))), color='#00B748',
                                                       arrowprops=dict(arrowstyle="->", connectionstyle="angle3,angleA=0,angleB=40", color='#00B748'), fontsize=fontsize)
-                elif row[column] == 'Up' or row[column] == 'Up+UXP' or row[column] == 'UXP' :
+                elif row[column] == 'Up' or row[column] == 'Up+UXP' or row[column] == 'UXP':
                     if row[column] == 'Up':
                         plot_to_annotate.annotate(text, xy=(index, row['Price']), xytext=(index + datetime.timedelta(**{freq: (duration * 1)}), (row['Price'] - (duration * 2))), color=color,
                                                   arrowprops=dict(arrowstyle="->", connectionstyle="angle3,angleA=0,angleB=-60", color=color), fontsize=fontsize - 1)
