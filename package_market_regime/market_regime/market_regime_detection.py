@@ -10,7 +10,7 @@ import re
 import math
 import pickle
 import traceback
-from market_regime.directional_change_fit import fit
+from market_regime.directional_change import directional_change
 np.random.seed(42)
 
 
@@ -37,21 +37,7 @@ class Market_regime:
         self.data['pct_change'] = self.data['Price'].pct_change(n_pct_change)
 
     def directional_change_fit(self, dc_offset=[0.1, 0.2]):
-        dc_offset.sort()
-        dc_offset.reverse()
-        self.data['BBTheta'] = pd.Series('bool')
-        self.data['OSV'] = pd.Series('float')
-        last_round = len(dc_offset) - 1
-        for item_number in range(len(dc_offset)):
-            current_offset_value = dc_offset[item_number]
-            curent_offset_column = f"Event_{current_offset_value}"
-            self.data[curent_offset_column] = pd.Series('string')
-            self.DC_event = 'init'
-            self.DC_highest_price = self.data.iloc[0]
-            self.DC_lowest_price = self.data.iloc[0]
-            is_last_round = item_number == last_round
-            self.data.apply(lambda row: fit(
-                self, row, current_offset_value, curent_offset_column, is_last_round), axis=1)
+        self.data = directional_change(self.data, dc_offset)
         return self
 
     def markov_switching_regression_fit(self, k_regimes=3, summary=False, expected_duration=False):
