@@ -34,7 +34,7 @@ class Market_regime:
             elif self.data_freq == 'm':
                 frequency = 'T'
             self.data = self.data.asfreq(frequency, method='ffill')
-        self.data['pct_change'] = self.data['Price'].pct_change(n_pct_change)
+        self.data['pct_change'] = self.data['Price'].pct_change(n_pct_change).dropna()
 
     def directional_change_fit(self, dc_offset=[0.1, 0.2]):
         self.data = directional_change(self.data, dc_offset)
