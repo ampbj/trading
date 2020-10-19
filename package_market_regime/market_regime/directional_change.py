@@ -23,18 +23,17 @@ class directional_change:
             self.DC_highest_price_index = self.data.iloc[0].index
             self.DC_lowest_price_index = self.data.iloc[0].index
             self.is_last_round = item_number == last_round
-            return self.init()
+            self.init()
 
     def init(self):
-        self.data.apply(lambda row: self.fit(row.name, row['Price']), axis=1)
-        return self.data
+        _ = [self.fit(index, price) for index, price in zip(
+            self.data.index, self.data['Price'])]
 
-    # directional change fitting function
-    def fit(self, row_name, row_price):
+    def fit(self, index, price):
         if self.DC_event == 'downtrend' or self.DC_event == 'init':
-            if row_price >= (self.DC_lowest_price * (1 + self.current_offset_value)):
+            if price >= (self.DC_lowest_price * (1 + self.current_offset_value)):
                 self.DC_event = 'uptrend'
-                self.data.loc[row_name, self.curent_offset_column] = 'Up'
+                self.data.loc[index, self.curent_offset_column] = 'Up'
                 check_null_value = self.data.isnull(
                 ).loc[self.DC_lowest_price_index][self.curent_offset_column]
                 if check_null_value:
@@ -47,28 +46,27 @@ class directional_change:
                 if self.is_last_round:
                     # OSV discovery
                     osv_value = self.OSV(
-                        row_price, self.DC_lowest_price_index, self.dc_offset[0], 'Down')
-                    self.data.loc[row_name, 'OSV'] = osv_value
+                        price, self.DC_lowest_price_index, self.dc_offset[0], 'Down')
+                    self.data.loc[index, 'OSV'] = osv_value
                     # BBTheta boolean value discovery
                     dc_current_lowest_price = self.data.loc[
                         self.DC_lowest_price_index][f"Event_{self.dc_offset[0]}"]
                     if dc_current_lowest_price == 'DXP' or dc_current_lowest_price == 'Down+DXP':
-                        self.data.loc[row_name, 'BBTheta'] = True
+                        self.data.loc[index, 'BBTheta'] = True
                     else:
-                        self.data.loc[row_name, 'BBTheta'] = False
+                        self.data.loc[index, 'BBTheta'] = False
 
-                self.DC_highest_price = row_price
-                self.DC_highest_price_index = row_name
+                self.DC_highest_price = price
+                self.DC_highest_price_index = index
 
-            if row_price <= self.DC_lowest_price:
-                self.DC_lowest_price = row_price
-                self.DC_lowest_price_index = row_name
-
+            if price <= self.DC_lowest_price:
+                self.DC_lowest_price = price
+                self.DC_lowest_price_index = index
         if self.DC_event == 'uptrend' or self.DC_event == 'init':
-            if row_price <= (self.DC_highest_price * (1 - self.current_offset_value)):
+            if price <= (self.DC_highest_price * (1 - self.current_offset_value)):
                 self.DC_event = 'downtrend'
-                self.data.loc[row_name, self.curent_offset_column] = 'Down'
-                check_null_value = data.isnull(
+                self.data.loc[index, self.curent_offset_column] = 'Down'
+                check_null_value = self.data.isnull(
                 ).loc[self.DC_highest_price_index][self.curent_offset_column]
                 if check_null_value:
                     self.data.loc[self.DC_highest_price_index,
@@ -79,26 +77,33 @@ class directional_change:
 
                 if self.is_last_round:
                     # OSV discovery
-                    osv_value = self.OSV(row_price,
-                                         self.DC_highest_price_index, self.dc_offset[0], 'Up')
-                    self.data.loc[row_name, 'OSV'] = osv_value
+                    osv_value = self.OSV(
+                        price, self.DC_highest_price_index, self.dc_offset[0], 'Up')
+                    self.data.loc[index, 'OSV'] = osv_value
                     # BBTheta boolean value discovery
                     dc_current_highest_price = self.data.loc[
                         self.DC_highest_price_index][f"Event_{self.dc_offset[0]}"]
                     if dc_current_highest_price == 'UXP' or dc_current_highest_price == 'Up+UXP':
-                        self.data.loc[row_name, 'BBTheta'] = True
+                        self.data.loc[index, 'BBTheta'] = True
                     else:
-                        self.data.loc[row_name, 'BBTheta'] = False
+                        self.data.loc[index, 'BBTheta'] = False
 
-                self.DC_lowest_price = row_price
-                self.DC_lowest_price_index = row_name
+                self.DC_lowest_price = price
+                self.DC_lowest_price_index = index
 
-                if row_price >= self.DC_highest_price:
-                    self.DC_highest_price = row_price
-                    self.DC_highest_price_index = row_name
+            if price >= self.DC_highest_price:
+                self.DC_highest_price = price
+                self.DC_highest_price_index = index
 
     # Calculating OSV value as an independent variable used for prediction according to the paper
-    def OSV(self, current_price, STheta_extreme_index, BTheta, direction):
+    def OSV(self, price, STheta_extreme_index, BTheta, direction):
+        def calculate_OSV_value(index, row):
+            if row == direction or row == alternate_direction_value:
+                PDCC_BTheta = self.data.loc[index]['Price']
+                OSV_value = ((price - PDCC_BTheta) /
+                            PDCC_BTheta) / BTheta
+                return OSV_value
+
         if direction == 'Down':
             alternate_direction_value = 'Down+DXP'
         if direction == 'Up':
@@ -107,15 +112,10 @@ class directional_change:
         BTheta_rows = self.data[self.data.index <= STheta_extreme_index]
         BTheta_rows = BTheta_rows[BTheta_rows[BTheta_column].notnull(
         )][BTheta_column]
+        BTheta_rows = BTheta_rows[::-1]
         if not BTheta_rows.empty:
-            BTheta_rows[::-1].apply(lambda row: self.calculate_OSV_value(
-                direction, alternate_direction_value, row, row.index, current_price, BTheta))
-        else:
-            return
-
-    def calculate_OSV_value(self, direction, alternate_direction_value, row, index, current_price, BTheta):
-        if row == direction or row == alternate_direction_value:
-            PDCC_BTheta = self.data.loc[index]['Price']
-            OSV = ((current_price - PDCC_BTheta) /
-                   PDCC_BTheta) / BTheta
-            return OSV
+            returned_list = [calculate_OSV_value(index, row) for index, row in zip(
+                BTheta_rows.index, BTheta_rows.values)]
+        OSV_value = next((item for item in returned_list if item is not None), None)
+        if OSV_value is not None:
+            return OSV_value

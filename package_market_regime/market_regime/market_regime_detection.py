@@ -37,7 +37,8 @@ class Market_regime:
         self.data['pct_change'] = self.data['Price'].pct_change(n_pct_change).dropna()
 
     def directional_change_fit(self, dc_offset=[0.1, 0.2]):
-        self.data = directional_change(self.data, dc_offset)
+        returned = directional_change(self.data, dc_offset)
+        self.data = returned.data
         return self
 
     def markov_switching_regression_fit(self, k_regimes=3, summary=False, expected_duration=False):
