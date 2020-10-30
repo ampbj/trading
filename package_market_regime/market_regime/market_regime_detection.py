@@ -10,7 +10,10 @@ import re
 import math
 import pickle
 import traceback
-from market_regime.directional_change import directional_change
+import imp
+dc_module = imp.load_source(
+    "directional_change", '/Users/ryanjadidi/Dev/trading/package_market_regime/market_regime/directional_change.py')
+#from market_regime.directional_change import directional_change
 np.random.seed(42)
 
 
@@ -26,6 +29,7 @@ class Market_regime:
         # check if index is object
         if self.data.index.dtype.name == 'object':
             self.data.index = pd.to_datetime(self.data.index)
+        frequency = None
         if not pd.infer_freq(self.data):
             if self.data_freq == 'd':
                 frequency = 'B'
@@ -34,10 +38,12 @@ class Market_regime:
             elif self.data_freq == 'm':
                 frequency = 'T'
             self.data = self.data.asfreq(frequency, method='ffill')
-        self.data['pct_change'] = self.data['Price'].pct_change(n_pct_change).dropna()
+        self.data['pct_change'] = self.data['Price'].pct_change(
+            n_pct_change).dropna()
+        
 
     def directional_change_fit(self, dc_offset=[0.1, 0.2]):
-        returned = directional_change(self.data, dc_offset)
+        returned = dc_module.directional_change(self.data, dc_offset)
         self.data = returned.data
         return self
 

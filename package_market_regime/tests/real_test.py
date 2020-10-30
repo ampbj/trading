@@ -7,7 +7,7 @@ import datetime
 from market_regime.market_regime_detection import Market_regime as mrd
 from market_regime import config
 
-long_term = False
+long_term = True
 secs = ['SPY']
 #short-term check
 if not long_term:
@@ -16,6 +16,6 @@ if not long_term:
         MR.plot_market_regime(day_interval=1, no_markov=False, plot_hmm=True)
 
 else:
-        data = DataReader(secs, 'yahoo', '2010-12-01',str(datetime.date.today()))['Adj Close']
+        data = DataReader(secs, 'yahoo', '2019-12-01',str(datetime.date.today()))['Adj Close']
         MR = mrd(data, data_freq='d').directional_change_fit(dc_offset=[0.1, 0.15]).markov_switching_regression_fit().hidden_markov_model_fit()
         MR.plot_market_regime(day_interval=20, no_markov=True, plot_hmm=False)
